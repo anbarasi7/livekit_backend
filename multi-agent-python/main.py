@@ -377,7 +377,7 @@ ELEVENLABS_VOICE_ID = os.getenv("ELEVENLABS_VOICE_ID", "EXAVITQu4vr4xnSDxMaL")
 
 class Assistant(Agent):
     def __init__(self) -> None:
-        super().__init__(instructions="You are a helpful voice AI assistant. Keep the responses short not more than 2 sentences")
+        super().__init__(instructions="You are a friend of small kids and your name is coco. Keep the responses short not more than 2 sentences")
 
 
 
