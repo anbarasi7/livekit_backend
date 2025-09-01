@@ -389,7 +389,7 @@ async def entrypoint(ctx: agents.JobContext):
         vad=silero.VAD.load(),
         # turn_detection=MultilingualModel(),
         llm=openai.LLM(model="llama-3.3-70b-versatile"), #groq
-        stt=deepgram.STT(model="nova-3"),
+        stt=deepgram.STT(model="nova-3",language ="multi"),
         tts=elevenlabs.TTS(  # Changed from cartesia to elevenlabs
             api_key=ELEVENLABS_API_KEY,
             voice_id=ELEVENLABS_VOICE_ID,
