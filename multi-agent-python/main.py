@@ -346,21 +346,25 @@ import jwt
 import time
 import httpx
 import os
-import os
 from livekit import agents
 from livekit.agents import AgentSession, Agent, RoomInputOptions
 from livekit.plugins import (
     openai,
+    google,
     cartesia,
-    # deepgram,
-    # noise_cancellation,
     silero,
     elevenlabs
+    # deepgram,
+    # noise_cancellation,
 )
+
 # from livekit.plugins.turn_detector.multilingual import MultilingualModel
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
 
+app = FastAPI()
 import deepgram
-
+load_dotenv("./voice.env")
 LIVEKIT_API_KEY = os.getenv("LIVEKIT_API_KEY")
 LIVEKIT_API_SECRET = os.getenv("LIVEKIT_API_SECRET")
 LIVEKIT_URL = os.getenv("LIVEKIT_URL")
@@ -379,6 +383,38 @@ class Assistant(Agent):
     def __init__(self) -> None:
         super().__init__(instructions="You are a friend of small kids and your name is coco. Keep the responses short not more than 2 sentences")
 
+class LiveKitRequest(BaseModel):
+    childName: str
+    customPrompt: str
+    vapiKey: str
+    prompt: str
+    toyName: str
+    customTranscript: str
+
+@app.post("/start_livekit_session")
+async def start_livekit_session(params: LiveKitRequest):
+    try:
+        instructions = f"Child's name is {params.childName}. Toy: {params.toyName}. Custom prompt: {params.customPrompt}"
+        vapi_key = params.vapiKey
+
+        room_input_options = RoomInputOptions(
+            input_text=params.customTranscript if params.customTranscript else params.prompt,
+        )
+        session = AgentSession()
+        await session.start(
+            room="your_room_id",
+            agent=Assistant(),
+            room_input_options=room_input_options
+        )
+        reply = await session.generate_reply(instructions=params.prompt)
+        return {
+            "status": "success",
+            "reply": reply,
+            "childName": params.childName,
+            "toyName": params.toyName
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 async def entrypoint(ctx: agents.JobContext):
@@ -388,7 +424,7 @@ async def entrypoint(ctx: agents.JobContext):
         # tts=cartesia.TTS(model="sonic-2", voice="f786b574-daa5-4673-aa0c-cbe3e8534c02"),
         vad=silero.VAD.load(),
         # turn_detection=MultilingualModel(),
-        llm=openai.LLM(model="llama-3.3-70b-versatile"), #groq
+        llm=google.LLM(model="gemini-2.0-flash"), #groq
         stt=deepgram.STT(model="nova-3",language ="multi"),
         tts=elevenlabs.TTS(  # Changed from cartesia to elevenlabs
             api_key=ELEVENLABS_API_KEY,

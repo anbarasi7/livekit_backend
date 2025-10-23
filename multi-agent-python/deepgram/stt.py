@@ -54,7 +54,6 @@ BASE_URL = "https://api.deepgram.com/v1/listen"
 # to possibly contain speech. It's very conservative.
 MAGIC_NUMBER_THRESHOLD = 0.004**2
 
-
 class AudioEnergyFilter:
     class State(Enum):
         START = 0
