@@ -359,10 +359,7 @@ from livekit.plugins import (
 )
 
 # from livekit.plugins.turn_detector.multilingual import MultilingualModel
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
 
-app = FastAPI()
 import deepgram
 load_dotenv("./voice.env")
 LIVEKIT_API_KEY = os.getenv("LIVEKIT_API_KEY")
@@ -382,40 +379,6 @@ ELEVENLABS_VOICE_ID = os.getenv("ELEVENLABS_VOICE_ID", "EXAVITQu4vr4xnSDxMaL")
 class Assistant(Agent):
     def __init__(self) -> None:
         super().__init__(instructions="You are a friend of small kids and your name is coco. Keep the responses short not more than 2 sentences")
-
-class LiveKitRequest(BaseModel):
-    childName: str
-    customPrompt: str
-    vapiKey: str
-    prompt: str
-    toyName: str
-    customTranscript: str
-
-@app.post("/start_livekit_session")
-async def start_livekit_session(params: LiveKitRequest):
-    try:
-        instructions = f"Child's name is {params.childName}. Toy: {params.toyName}. Custom prompt: {params.customPrompt}"
-        vapi_key = params.vapiKey
-
-        room_input_options = RoomInputOptions(
-            input_text=params.customTranscript if params.customTranscript else params.prompt,
-        )
-        session = AgentSession()
-        await session.start(
-            room="your_room_id",
-            agent=Assistant(),
-            room_input_options=room_input_options
-        )
-        reply = await session.generate_reply(instructions=params.prompt)
-        return {
-            "status": "success",
-            "reply": reply,
-            "childName": params.childName,
-            "toyName": params.toyName
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
 
 async def entrypoint(ctx: agents.JobContext):
     session = AgentSession(
