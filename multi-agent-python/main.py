@@ -361,7 +361,7 @@ from livekit.plugins import (
 # from livekit.plugins.turn_detector.multilingual import MultilingualModel
 
 import deepgram
-load_dotenv("./voice.env")
+load_dotenv("./livkey.env")
 LIVEKIT_API_KEY = os.getenv("LIVEKIT_API_KEY")
 LIVEKIT_API_SECRET = os.getenv("LIVEKIT_API_SECRET")
 LIVEKIT_URL = os.getenv("LIVEKIT_URL")
@@ -389,13 +389,14 @@ async def entrypoint(ctx: agents.JobContext):
         # turn_detection=MultilingualModel(),
         llm=google.LLM(model="gemini-2.0-flash"), #groq
         stt=deepgram.STT(model="nova-3",language ="multi"),
-        tts=elevenlabs.TTS(  # Changed from cartesia to elevenlabs
-            api_key=ELEVENLABS_API_KEY,
-            voice_id=ELEVENLABS_VOICE_ID,
+        tts=cartesia.TTS(model="sonic-english")
+        # tts=elevenlabs.TTS(  # Changed from cartesia to elevenlabs
+            #api_key=ELEVENLABS_API_KEY,
+            #voice_id=ELEVENLABS_VOICE_ID,
             # model="eleven_monolingual_v2",
             # stability=0.5,
-            # similarity_boost=0.75
-        ),
+            # similarity_boost=0.7
+        #),
     )
 
     await session.start(
