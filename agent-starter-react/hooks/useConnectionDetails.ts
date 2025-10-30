@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+
 import { ConnectionDetails } from '@/app/api/connection-details/route';
 
 export default function useConnectionDetails() {
@@ -15,10 +16,12 @@ export default function useConnectionDetails() {
 
   const fetchConnectionDetails = useCallback(() => {
     setConnectionDetails(null);
+    console.log("url-",process.env.NEXT_PUBLIC_CONN_DETAILS_ENDPOINT)
     const url = new URL(
       process.env.NEXT_PUBLIC_CONN_DETAILS_ENDPOINT ?? '/api/connection-details',
       window.location.origin
     );
+    
     fetch(url.toString())
       .then((res) => res.json())
       .then((data) => {
