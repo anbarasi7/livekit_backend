@@ -30,7 +30,7 @@ const animationProps = {
     scale: 0,
   },
   transition: {
-    type: 'spring',
+    type: 'spring' as const, // Fixed: added 'as const'
     stiffness: 675,
     damping: 75,
     mass: 1,
@@ -145,7 +145,7 @@ export function MediaTiles({ chatOpen }: MediaTilesProps) {
                     layoutId="agent"
                     {...animationProps}
                     animate={agentAnimate}
-                    transition={agentLayoutTransition}
+                    transition={agentLayoutTransition} // Fixed: now uses the corrected transition
                     state={agentState}
                     audioTrack={agentAudioTrack}
                     className={cn(chatOpen ? 'h-[90px]' : 'h-auto w-full')}
@@ -158,7 +158,7 @@ export function MediaTiles({ chatOpen }: MediaTilesProps) {
                     layoutId="avatar"
                     {...animationProps}
                     animate={avatarAnimate}
-                    transition={avatarLayoutTransition}
+                    transition={avatarLayoutTransition} // Fixed: now uses the corrected transition
                     videoTrack={agentVideoTrack}
                     className={cn(
                       chatOpen ? 'h-[90px] [&>video]:h-[90px] [&>video]:w-auto' : 'h-auto w-full'
@@ -185,10 +185,7 @@ export function MediaTiles({ chatOpen }: MediaTilesProps) {
                   layoutId="camera"
                   {...animationProps}
                   trackRef={cameraTrack}
-                  transition={{
-                    ...animationProps.transition,
-                    delay: chatOpen ? 0 : 0.15,
-                  }}
+                  transition={transition} // Fixed: replaced inline object with corrected transition
                   className="h-[90px]"
                 />
               )}
@@ -200,10 +197,7 @@ export function MediaTiles({ chatOpen }: MediaTilesProps) {
                   layoutId="screen"
                   {...animationProps}
                   trackRef={screenShareTrack}
-                  transition={{
-                    ...animationProps.transition,
-                    delay: chatOpen ? 0 : 0.15,
-                  }}
+                  transition={transition} // Fixed: replaced inline object with corrected transition
                   className="h-[90px]"
                 />
               )}
