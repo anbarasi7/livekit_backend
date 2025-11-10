@@ -1,58 +1,60 @@
-import { NextResponse } from 'next/server';
-import { AccessToken, type AccessTokenOptions, type VideoGrant } from 'livekit-server-sdk';
+import { NextResponse } from "next/server";
+import { AccessToken, type AccessTokenOptions, type VideoGrant } from "livekit-server-sdk";
 
-// NOTE: you are expected to define the following environment variables in `.env.local`:
 const API_KEY = process.env.LIVEKIT_API_KEY;
 const API_SECRET = process.env.LIVEKIT_API_SECRET;
 const LIVEKIT_URL = process.env.NEXT_PUBLIC_LIVEKIT_URL;
-console.log("LIVEKIT_URL:", process.env.NEXT_PUBLIC_LIVEKIT_URL);
-console.log("LIVEKIT_API_KEY:", process.env.LIVEKIT_API_KEY);
-console.log("LIVEKIT_API_SECRET:", process.env.LIVEKIT_API_SECRET);
-//console.log('API_KEY', API_KEY);
-//console.log('API_SECRET', API_SECRET);
-
-// don't cache the results
-export const revalidate = 0;
 
 export type ConnectionDetails = {
   serverUrl: string;
   roomName: string;
   participantName: string;
   participantToken: string;
+  // Include personalization data in response
+  name?: string;
+  age?: string;
+  interests?: string[];
 };
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    if (LIVEKIT_URL === undefined) {
-      throw new Error('LIVEKIT_URL is not defined');
-    }
-    if (API_KEY === undefined) {
-      throw new Error('LIVEKIT_API_KEY is not defined');
-    }
-    if (API_SECRET === undefined) {
-      throw new Error('LIVEKIT_API_SECRET is not defined');
+    if (!LIVEKIT_URL || !API_KEY || !API_SECRET) {
+      throw new Error("Missing LiveKit environment variables");
     }
 
-    // Generate participant token
-    const participantName = 'user';
+    const url = new URL(request.url);
+    const name = url.searchParams.get("name") || "user";
+    const age = url.searchParams.get("age") || "";
+    const interestsString = url.searchParams.get("interests") || "";
+    const interests = interestsString ? interestsString.split(",") : [];
+
     const participantIdentity = `voice_assistant_user_${Math.floor(Math.random() * 10_000)}`;
     const roomName = `voice_assistant_room_${Math.floor(Math.random() * 10_000)}`;
+
     const participantToken = await createParticipantToken(
-      { identity: participantIdentity, name: participantName },
+      { identity: participantIdentity, name },
       roomName
     );
 
-    // Return connection details
+    // Prepare connection details including personalization info
     const data: ConnectionDetails = {
       serverUrl: LIVEKIT_URL,
       roomName,
-      participantToken: participantToken,
-      participantName,
+      participantName: name,
+      participantToken,
+      name,
+      age,
+      interests,
     };
-    const headers = new Headers({
-      'Cache-Control': 'no-store',
+
+    // Optionally pass personalization to your Python agent backend here
+    await notifyAgentBackend(data);
+
+    return NextResponse.json(data, {
+      headers: {
+        "Cache-Control": "no-store",
+      },
     });
-    return NextResponse.json(data, { headers });
   } catch (error) {
     if (error instanceof Error) {
       console.error(error);
@@ -61,14 +63,13 @@ export async function GET() {
   }
 }
 
+// Generate LiveKit participant token
 function createParticipantToken(userInfo: AccessTokenOptions, roomName: string) {
-  console.log('API_KEY', API_KEY);
-  console.log('API_SECRET', API_SECRET);
-
-  const at = new AccessToken(API_KEY, API_SECRET, {
+  const at = new AccessToken(API_KEY!, API_SECRET!, {
     ...userInfo,
-    ttl: '15m',
+    ttl: "15m",
   });
+
   const grant: VideoGrant = {
     room: roomName,
     roomJoin: true,
@@ -78,4 +79,22 @@ function createParticipantToken(userInfo: AccessTokenOptions, roomName: string) 
   };
   at.addGrant(grant);
   return at.toJwt();
+}
+
+// Notify the Python agent backend with personalization (optional, adjust URL & payload)
+async function notifyAgentBackend(connectionDetails: ConnectionDetails) {
+  try {
+    await fetch("http://your-python-agent-backend/agent-personalization", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        room: connectionDetails.roomName,
+        participant: connectionDetails.participantName,
+        age: connectionDetails.age,
+        interests: connectionDetails.interests,
+      }),
+    });
+  } catch (err) {
+    console.error("Failed to notify agent backend:", err);
+  }
 }
