@@ -5,6 +5,7 @@ const API_KEY = process.env.LIVEKIT_API_KEY;
 const API_SECRET = process.env.LIVEKIT_API_SECRET;
 const LIVEKIT_URL = process.env.NEXT_PUBLIC_LIVEKIT_URL;
 
+
 export type ConnectionDetails = {
   serverUrl: string;
   roomName: string;
@@ -53,6 +54,9 @@ export async function GET(request: Request) {
     return NextResponse.json(data, {
       headers: {
         "Cache-Control": "no-store",
+        "Access-Control-Allow-Origin": "*", // Or set your frontend origin for more security
+        "Access-Control-Allow-Methods": "GET, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type",
       },
     });
   } catch (error) {
