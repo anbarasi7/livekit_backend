@@ -339,45 +339,41 @@
 
 
 
+from fastapi import FastAPI, Request
+from pydantic import BaseModel
+import os
 from dotenv import load_dotenv
-import jwt
-import time
-import httpx
-import os
-import os
 from livekit import agents
 from livekit.agents import AgentSession, Agent, RoomInputOptions
-from livekit.plugins import (
-    openai,
-    google,
-    cartesia,
-    # deepgram,
-    # noise_cancellation,
-    silero,
-    elevenlabs
-)
-# from livekit.plugins.turn_detector.multilingual import MultilingualModel
+from livekit.plugins import google, silero, deepgram, cartesia
 
-import deepgram
+load_dotenv(dotenv_path=".env.local")
 
 LIVEKIT_API_KEY = os.getenv("LIVEKIT_API_KEY")
 LIVEKIT_API_SECRET = os.getenv("LIVEKIT_API_SECRET")
 LIVEKIT_URL = os.getenv("LIVEKIT_URL")
 
+app = FastAPI()
 
-
-# from livekit.plugins.turn_detector.multilingual import MultilingualModel
-
-load_dotenv(dotenv_path=".env.local")
-
+class AgentParams(BaseModel):
+    childName: str
+    interests: str = ""
+    currentLearning: str = ""
 
 class Assistant(Agent):
-    def __init__(self) -> None:
-        super().__init__(instructions="You are a friend of small kids and your name is coco. Keep the responses short not more than 2 sentences")
+    def __init__(self, childName, interests, currentLearning) -> None:
+        instructions = (
+            f"You are a friend of small kids and your name is coco. "
+            f"Child's name is {childName}. "
+            f"Interests: {interests}. "
+            f"Current learning: {currentLearning}. "
+            f"Keep the responses short not more than 2 sentences."
+        )
+        super().__init__(instructions=instructions)
 
-
-
-async def entrypoint(ctx: agents.JobContext):
+@app.post("/create-agent-session")
+async def create_agent_session(params: AgentParams, request: Request):
+    # Create new AgentSession with parameters passed from frontend
     session = AgentSession(
         vad=silero.VAD.load(),
         llm=google.LLM(model="gemini-2.0-flash"),
@@ -385,27 +381,33 @@ async def entrypoint(ctx: agents.JobContext):
         tts=cartesia.TTS(model="sonic-english"),
     )
 
+    assistant = Assistant(params.childName, params.interests, params.currentLearning)
+
+    # Use LiveKit URL and API keys as needed here to create room or join existing room
+    # For example, assuming ctx.room can be fetched or created for the user
+    # This example uses a placeholder room identity - you should integrate with your room logic
+    class DummyCtx:
+        room = "room-id-placeholder"
+
+        async def connect(self):
+            pass
+
+    ctx = DummyCtx()
+
     await session.start(
         room=ctx.room,
-        agent=Assistant(),
+        agent=assistant,
         room_input_options=RoomInputOptions(
-            # LiveKit Cloud enhanced noise cancellation
-            # - If self-hosting, omit this parameter
-            # - For telephony applications, use `BVCTelephony` for best results
-            # noise_cancellation=noise_cancellation.BVC(), 
+            # e.g., noise_cancellation can be added here if needed
         ),
     )
 
     await ctx.connect()
 
-    await session.generate_reply(
-        instructions="Greet the user and offer your assistance."
-    )
+    await session.generate_reply(instructions="Greet the user and offer your assistance.")
 
-
-if __name__ == "__main__":
-    agents.cli.run_app(agents.WorkerOptions(entrypoint_fnc=entrypoint))
-
+    # Return confirmation or room connection info to frontend
+    return {"status": "success", "room": ctx.room}
 
 
 
