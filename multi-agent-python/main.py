@@ -340,89 +340,71 @@
 
 
 from dotenv import load_dotenv
+import jwt
+import time
+import httpx
 import os
-from fastapi import FastAPI, Request
-from pydantic import BaseModel
-import uvicorn
-import asyncio
+import os
 from livekit import agents
 from livekit.agents import AgentSession, Agent, RoomInputOptions
-from livekit.plugins import google, deepgram, silero, cartesia
-from typing import Optional, List
+from livekit.plugins import (
+    openai,
+    google,
+    cartesia,
+    # deepgram,
+    # noise_cancellation,
+    silero,
+    elevenlabs
+)
+# from livekit.plugins.turn_detector.multilingual import MultilingualModel
 
-load_dotenv("./livkey.env")
+import deepgram
 
-app = FastAPI()
+LIVEKIT_API_KEY = os.getenv("LIVEKIT_API_KEY")
+LIVEKIT_API_SECRET = os.getenv("LIVEKIT_API_SECRET")
+LIVEKIT_URL = os.getenv("LIVEKIT_URL")
 
-# --- Assistant class supporting userdata personalization ---
+
+
+# from livekit.plugins.turn_detector.multilingual import MultilingualModel
+
+load_dotenv(dotenv_path=".env.local")
+
+
 class Assistant(Agent):
-    def __init__(self, userdata: dict = None) -> None:
-        user_name = userdata.get("name", "friend") if userdata else "friend"
-        user_age = userdata.get("age", None) if userdata else None
-        user_interests = userdata.get("interests", []) if userdata else []
+    def __init__(self) -> None:
+        super().__init__(instructions="You are a friend of small kids and your name is coco. Keep the responses short not more than 2 sentences")
 
-        interests_str = ", ".join(user_interests) if user_interests else "many things"
-        background = f"The user you're talking to is named {user_name}, is {user_age} years old, and likes {interests_str}."
-        super().__init__(
-            instructions=f"You are a friend of small kids and your name is coco. {background} Always answer as if you know these personal facts."
-        )
 
-# Pydantic model for receiving personalization data from backend API
-class PersonalizationData(BaseModel):
-    room: str
-    name: Optional[str] = "friend"
-    age: Optional[int] = None
-    interests: Optional[List[str]] = []
 
-# Global dictionary to track running sessions by room if needed
-running_sessions = {}
-
-@app.post("/agent-personalization")
-async def agent_personalization(data: PersonalizationData):
-    # Spawn a background task to start the agent with received personalization data
-    asyncio.create_task(start_agent_session(data))
-    return {"message": "Agent personalization starting", "room": data.room}
-
-async def start_agent_session(data: PersonalizationData):
-    userdata = {
-        "name": data.name,
-        "age": data.age,
-        "interests": data.interests,
-    }
-
+async def entrypoint(ctx: agents.JobContext):
     session = AgentSession(
         vad=silero.VAD.load(),
         llm=google.LLM(model="gemini-2.0-flash"),
         stt=deepgram.STT(model="nova-3", language="multi"),
         tts=cartesia.TTS(model="sonic-english"),
-        userdata=userdata,
     )
-    
-    # Store session if you want to track it later
-    running_sessions[data.room] = session
 
-    # Start the LiveKit agent session in the specified room
     await session.start(
-        room=data.room,
-        agent=Assistant(userdata),
-        room_input_options=RoomInputOptions(),
+        room=ctx.room,
+        agent=Assistant(),
+        room_input_options=RoomInputOptions(
+            # LiveKit Cloud enhanced noise cancellation
+            # - If self-hosting, omit this parameter
+            # - For telephony applications, use `BVCTelephony` for best results
+            # noise_cancellation=noise_cancellation.BVC(), 
+        ),
     )
 
-    # Connect asynchronously to the LiveKit signaling layer
-    await session.connect()
+    await ctx.connect()
 
-    # Optionally send a greeting message personalized by user name
-    user_name = userdata.get("name", "friend")
     await session.generate_reply(
-        instructions=f"Hello {user_name}! How can I help you today?"
+        instructions="Greet the user and offer your assistance."
     )
 
-# If running standalone, start API server for receiving personalization POSTs
+
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("AGENT_API_PORT", 8000)))
-
-
-
+    agents.cli.run_app(agents.WorkerOptions(entrypoint_fnc=entrypoint))
 
 
 

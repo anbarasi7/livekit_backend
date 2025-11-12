@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 
+
 import { ConnectionDetails } from '@/app/api/connection-details/route';
 
 
@@ -13,9 +14,7 @@ export default function useConnectionDetails() {
   // In real-world application, you would likely allow the user to specify their
   // own participant name, and possibly to choose from existing rooms to join.
 
-
   const [connectionDetails, setConnectionDetails] = useState<ConnectionDetails | null>(null);
-
 
   const fetchConnectionDetails = useCallback(() => {
     setConnectionDetails(null);
@@ -38,9 +37,11 @@ export default function useConnectionDetails() {
   }, []);
 
 
+
   useEffect(() => {
     fetchConnectionDetails();
   }, [fetchConnectionDetails]);
+
 
 
   return { connectionDetails, refreshConnectionDetails: fetchConnectionDetails };
