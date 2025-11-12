@@ -337,80 +337,98 @@
 #     agents.cli.run_app(agents.WorkerOptions(entrypoint_fnc=entrypoint))
 
 
-
-
+# main.py
 from fastapi import FastAPI, Request
-from pydantic import BaseModel
-import os
 from dotenv import load_dotenv
+import os
 from livekit import agents
 from livekit.agents import AgentSession, Agent, RoomInputOptions
-from livekit.plugins import google, silero, deepgram, cartesia
+from livekit.plugins import google, deepgram, silero, cartesia
 
-load_dotenv(dotenv_path=".env.local")
-
-LIVEKIT_API_KEY = os.getenv("LIVEKIT_API_KEY")
-LIVEKIT_API_SECRET = os.getenv("LIVEKIT_API_SECRET")
-LIVEKIT_URL = os.getenv("LIVEKIT_URL")
+load_dotenv(".env.local")
 
 app = FastAPI()
 
-class AgentParams(BaseModel):
-    childName: str
-    interests: str = ""
-    currentLearning: str = ""
+# Temporary storage for demo purposes only: store userdata per user/session ID in a dict
+_user_data_store = {}
 
 class Assistant(Agent):
-    def __init__(self, childName, interests, currentLearning) -> None:
+    def __init__(self, userdata=None):
+        user_name = userdata.get("name", "friend") if userdata else "friend"
+        user_age = userdata.get("age", None) if userdata else None
+        user_interests = userdata.get("interests", []) if userdata else []
+
+        interests_str = ", ".join(user_interests) if user_interests else "many things"
+        background = (
+            f"The user you're talking to is named {user_name}, is {user_age} years old, "
+            f"and likes {interests_str}."
+        )
         instructions = (
-            f"You are a friend of small kids and your name is coco. "
-            f"Child's name is {childName}. "
-            f"Interests: {interests}. "
-            f"Current learning: {currentLearning}. "
-            f"Keep the responses short not more than 2 sentences."
+            "You are a friend of small kids and your name is coco. "
+            f"{background} Always answer as if you know these personal facts. "
+            "Keep responses short and friendly."
         )
         super().__init__(instructions=instructions)
 
 @app.post("/create-agent-session")
-async def create_agent_session(params: AgentParams, request: Request):
-    # Create new AgentSession with parameters passed from frontend
+async def create_agent_session(request: Request):
+    data = await request.json()
+    print("Received parameters from frontend:", data)  # Log received data
+
+    # For demo, generate a "session id" or get from request (better with auth)
+    session_id = data.get("sessionId", "default_session")
+
+    # Save userdata for this session
+    _user_data_store[session_id] = {
+        "name": data.get("childName", "friend"),
+        "age": data.get("age", None),
+        "interests": data.get("interests", []),
+    }
+
+    # Here you would start the LiveKit agent job, passing session_id or userdata as parameters
+    # For demo: just return success
+    return {"status": "success", "sessionId": session_id}
+
+async def entrypoint(ctx: agents.JobContext):
+    # Extract user info by some method:
+    # For example, receive session_id from ctx.parameters, then fetch data from _user_data_store
+
+    session_id = None
+    if hasattr(ctx, "parameters") and ctx.parameters:
+        session_id = ctx.parameters.get("sessionId")
+
+    userdata = _user_data_store.get(session_id, {
+        "name": "friend",
+        "age": None,
+        "interests": [],
+    })
+
     session = AgentSession(
         vad=silero.VAD.load(),
         llm=google.LLM(model="gemini-2.0-flash"),
         stt=deepgram.STT(model="nova-3", language="multi"),
         tts=cartesia.TTS(model="sonic-english"),
+        userdata=userdata,
     )
 
-    assistant = Assistant(params.childName, params.interests, params.currentLearning)
-
-    # Use LiveKit URL and API keys as needed here to create room or join existing room
-    # For example, assuming ctx.room can be fetched or created for the user
-    # This example uses a placeholder room identity - you should integrate with your room logic
-    class DummyCtx:
-        room = "room-id-placeholder"
-
-        async def connect(self):
-            pass
-
-    ctx = DummyCtx()
 
     await session.start(
         room=ctx.room,
-        agent=assistant,
-        room_input_options=RoomInputOptions(
-            # e.g., noise_cancellation can be added here if needed
-        ),
+        agent=Assistant(userdata),
+        room_input_options=RoomInputOptions(),
     )
 
     await ctx.connect()
 
-    await session.generate_reply(instructions="Greet the user and offer your assistance.")
+    user_name = userdata.get("name", "friend")
+    await session.generate_reply(
+        instructions=f"Hello {user_name}! How can I help you today?"
+    )
+    # No return statement here
 
-    # Return confirmation or room connection info to frontend
-    return {"status": "success", "room": ctx.room}
 
-
-
+if __name__ == "__main__":
+    agents.cli.run_app(agents.WorkerOptions(entrypoint_fnc=entrypoint))
 
 # import os
 # import asyncio
